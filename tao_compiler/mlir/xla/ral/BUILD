@@ -6,7 +6,8 @@ load(
     "tf_cc_test",
     "tf_copts",
     "tf_gpu_kernel_library",
-    "tf_gpu_library",
+    # "tf_gpu_library",
+    "tf_cuda_library",
     "tf_native_cc_binary",
 )
 load(
@@ -309,7 +310,7 @@ cc_library(
     alwayslink = 1,
 )
 
-tf_gpu_library(
+tf_cuda_library(
     name = "dynamic_sort",
     srcs = [
         "context/dynamic_sort_impl.cc",
@@ -624,7 +625,7 @@ cc_library(
     ] + if_rocm_is_configured([
         "-DTENSORFLOW_USE_ROCM=1",
         "-x rocm",
-    ]),
+    ]) + ["-DTF_1_12", "-DTF_MAJOR=1", "-DTF_MINOR=12"],
     deps = [
         ":common_context_bridge",
         ":context_util",

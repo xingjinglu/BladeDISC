@@ -1,9 +1,9 @@
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
-load("@local_config_tf//:build_defs.bzl", "tf_copts")
+# load("@local_config_tf//:build_defs.bzl", "tf_copts")
 load("@local_config_cuda//cuda:build_defs.bzl", "cuda_library", "if_cuda")
 
 # NOTE(lanbo.llb): if_dcu when building for tf serving is just a dummy impl
-load("@local_config_rocm//rocm:build_defs.bzl", "if_dcu", "if_rocm")
+# load("@local_config_rocm//rocm:build_defs.bzl", "if_dcu", "if_rocm")
 load("//:tao_bridge.bzl", "tao_bridge_cc_test")
 load(
     "@local_config_blade_disc_helper//:build_defs.bzl",
@@ -16,7 +16,7 @@ load(
     "if_tf_serving",
 )
 load("@org_tensorflow//tensorflow:tensorflow.bzl", "tf_cc_shared_object")
-load("@local_config_rocm//rocm:build_defs.bzl", "if_dcu", "if_rocm")
+# load("@local_config_rocm//rocm:build_defs.bzl", "if_dcu", "if_rocm")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -112,12 +112,7 @@ cc_library(
     ),
     copts = if_cuda([
         "-DGOOGLE_CUDA=1",
-    ]) + if_dcu([
-        "-DTENSORFLOW_USE_DCU=1",
-    ]) + if_rocm([
-        "-DTENSORFLOW_USE_ROCM=1",
-        "-x rocm",
-    ]) + tf_copts(),
+    ]) + ["-DTF_1_12", "-DTF_MAJOR=1", "-DTF_MINOR=12"],
     linkopts = [
         "-lm",
     ],
@@ -129,8 +124,8 @@ cc_library(
         [
             "@org_tensorflow//tensorflow/core:lib",
             "@org_tensorflow//tensorflow/core:framework",
-            "@org_tensorflow//tensorflow/core/common_runtime:core_cpu",
-            "@org_tensorflow//tensorflow/core/platform:stream_executor_no_cuda",
+            "@org_tensorflow//tensorflow/core:core_cpu",
+            "@org_tensorflow//tensorflow/core:stream_executor_no_cuda",
             "@org_tensorflow//tensorflow/stream_executor:stream_executor_impl",
         ],
         [
