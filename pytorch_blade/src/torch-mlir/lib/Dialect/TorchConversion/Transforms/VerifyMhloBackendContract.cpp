@@ -34,6 +34,7 @@
 #include "torch-mlir/Conversion/TorchToSCF/TorchToSCF.h"
 #include "torch-mlir/Conversion/TorchToStd/TorchToStd.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchTypes.h"
+#include "torch-mlir/Dialect/Torch/Transforms/Passes.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
 
@@ -59,16 +60,19 @@ class VerifyMhloBackendContractPass
     // the convert_ty function will convert !torch.vtensor to builtin tensor
     auto convert_ty = [&](BlockArgument& arg) -> Type {
       Type type = arg.getType();
-      auto vtensorTy = type.dyn_cast_or_null<ValueTensorType>();
-      if (vtensorTy) {
-        type = vtensorTy.toBuiltinTensor();
+      if (type.isa<BaseTensorType>()) {
+        auto vtensorTy = type.dyn_cast_or_null<ValueTensorType>();
+        if (vtensorTy) {
+          type = vtensorTy.toBuiltinTensor();
+        } else {
+          auto tensorTy = type.dyn_cast<NonValueTensorType>();
+          type = tensorTy.getWithValueSemantics().toBuiltinTensor();
+        }
         arg.setType(type);
-      }
-      if (type.isa<Torch::FloatType>()) {
+      } else if (type.isa<Torch::FloatType>()) {
         type = Float64Type::get(context);
         arg.setType(type);
-      }
-      if (type.isa<Torch::IntType>()) {
+      } else if (type.isa<Torch::IntType>()) {
         type = IntegerType::get(context, 64);
         arg.setType(type);
       }
@@ -171,6 +175,7 @@ void TorchConversion::createTorchBackendToMhloBackendPipeline(
     const Torch::TorchLoweringPipelineOptions& options) {
   // Check some invariants to catch errors in a clear way.
   pm.addPass(createVerifyInvariantsBeforeBackendLoweringPass());
+  pm.addNestedPass<func::FuncOp>(createApplyValueSemanticsPass());
 
   ::mlir::torch::Torch::TorchLoweringPipelineOptions funcOptions;
   funcOptions.decompose = false;
@@ -184,6 +189,8 @@ void TorchConversion::createTorchBackendToMhloBackendPipeline(
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   pm.addNestedPass<func::FuncOp>(createApplyValueSemanticsPass());
+
+  // Check some invariants to catch errors in a clear way.
   pm.addNestedPass<func::FuncOp>(createConvertTorchToMhloPass());
   pm.addNestedPass<func::FuncOp>(createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(createConvertTorchToStdPass());

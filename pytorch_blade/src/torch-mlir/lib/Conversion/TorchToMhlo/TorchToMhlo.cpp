@@ -39,6 +39,8 @@
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/BackendTypeConversion.h"
 
+#include <iostream>
+
 using namespace mlir;
 using namespace mlir::torch;
 using namespace mlir::torch::Torch;
@@ -1160,7 +1162,6 @@ class ConvertAtenMatmulBaseOp : public OpConversionPattern<AtenOpT> {
       OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     Value lhs, rhs;
-
     if (failed(readMatMulInputs(op, adaptor, rewriter, lhs, rhs)))
       return op.emitError("Failed to read matmul inputs");
 
@@ -1308,6 +1309,7 @@ class ConvertAtenLinearOp : public ConvertAtenMatmulBaseOp<AtenOpT> {
     }
 
     Value matmulPlusBias = matmulOutput;
+
     if (!biasTy.template isa<Torch::NoneType>()) {
       // Bias addition broadcasts to the matmul output shape.
       matmulPlusBias = rewriter
@@ -1322,11 +1324,9 @@ class ConvertAtenLinearOp : public ConvertAtenMatmulBaseOp<AtenOpT> {
 
     rewriter.replaceOpWithNewOp<mhlo::ConvertOp>(
         op,
-        OpConversionPattern<AtenOpT>::getTypeConverter()
-            ->convertType(op.getType())
-            .template cast<RankedTensorType>(),
+        OpConversionPattern<AtenOpT>::getTypeConverter()->convertType(
+            op.getType()),
         matmulPlusBias);
-
     return success();
   }
 };
@@ -2368,6 +2368,7 @@ class ConvertTorchToMhlo
     INSERT_UNARY_PATTERN(AtenRsqrtOp, mhlo::RsqrtOp)
     INSERT_UNARY_PATTERN(AtenBitwiseNotOp, mhlo::NotOp)
     INSERT_UNARY_PATTERN(AtenCeilOp, mhlo::CeilOp)
+    INSERT_UNARY_PATTERN(AtenItemOp, tensor::ExtractOp)
 
     // It's tricky that ConvertOp will use type from the return,
     // but not from the operand here.

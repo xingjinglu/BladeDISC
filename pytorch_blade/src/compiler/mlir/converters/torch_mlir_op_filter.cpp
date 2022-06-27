@@ -48,6 +48,7 @@ std::unordered_set<std::string> GetTorchMlirWhiteList() {
       "aten::exp",
       "aten::expand",
       "aten::expand_as",
+      "aten::flatten",
       "aten::flip",
       "aten::floor_divide",
       "aten::gelu",
@@ -68,6 +69,7 @@ std::unordered_set<std::string> GetTorchMlirWhiteList() {
       "aten::relu",
       "aten::relu6",
       "aten::repeat",
+      "aten::reshape",
       "aten::roll",
       "aten::rsqrt",
       "aten::select",
@@ -82,7 +84,10 @@ std::unordered_set<std::string> GetTorchMlirWhiteList() {
       "aten::to.dtype",
       "aten::transpose",
       "aten::type_as",
+      "aten::view",
+      "aten::view_as",
       "prim::Constant",
+      "prim::ListConstruct",
       "prim::ListUnpack"};
 }
 // clang-format off
