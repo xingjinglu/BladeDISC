@@ -1345,7 +1345,8 @@ LogicalResult ConvertAtenOp<AtenIndexSelectOp>::matchAndRewrite(
     return rewriter.notifyMatchFailure(
         op, "Only constant dim is currently supported");
 
-  Value sliced = mhlo::getIndexSelect(rewriter, op, self, adaptor.index(), dim);
+  Value sliced =
+      mhlo::getGatheredTensor(rewriter, op, self, adaptor.index(), dim);
 
   rewriter.replaceOpWithNewOp<mhlo::ConvertOp>(
       op, getTypeConverter()->convertType(op.getType()), sliced);
@@ -1690,6 +1691,59 @@ LogicalResult ConvertAtenOp<AtenDropoutOp>::matchAndRewrite(
   rewriter.replaceOpWithNewOp<mhlo::ConvertOp>(
       op, getTypeConverter()->convertType(op.getType()), adaptor.input());
 
+  return success();
+}
+
+template <>
+LogicalResult ConvertAtenOp<AtenFlipOp>::matchAndRewrite(
+    AtenFlipOp op,
+    OpAdaptor adaptor,
+    ConversionPatternRewriter& rewriter) const {
+  auto self = adaptor.self();
+  auto selfTy = self.getType().template cast<RankedTensorType>();
+  if (!selfTy)
+    return op.emitError("Only ranked tensor types supported in MHLO");
+
+  SmallVector<int64_t, 4> dimListInt;
+  if (!matchPattern(op.dims(), m_TorchConstantIntList(dimListInt)))
+    return rewriter.notifyMatchFailure(
+        op, "Only constant dims are currently supported");
+
+  rewriter.replaceOpWithNewOp<mlir::mhlo::ReverseOp>(
+      op,
+      getTypeConverter()->convertType(op.getType()),
+      self,
+      BuildI64ElementsAttr(rewriter, dimListInt));
+
+  return success();
+}
+
+template <>
+LogicalResult ConvertAtenOp<AtenRollOp>::matchAndRewrite(
+    AtenRollOp op,
+    OpAdaptor adaptor,
+    ConversionPatternRewriter& rewriter) const {
+  auto self = adaptor.self();
+  auto selfTy = self.getType().template cast<RankedTensorType>();
+  if (!selfTy)
+    return op.emitError("Only ranked tensor types supported in MHLO");
+
+  SmallVector<int64_t, 4> shiftListInt;
+  if (!matchPattern(op.shifts(), m_TorchConstantIntList(shiftListInt)))
+    return rewriter.notifyMatchFailure(
+        op, "Only constant shifts are currently supported");
+
+  SmallVector<int64_t, 4> dimListInt;
+  if (!matchPattern(op.dims(), m_TorchConstantIntList(dimListInt)))
+    return rewriter.notifyMatchFailure(
+        op, "Only constant dims are currently supported");
+
+  auto roll = self;
+  for (size_t d = 0; d < dimListInt.size(); ++d) {
+    roll =
+        mhlo::getRollTensor(rewriter, op, roll, shiftListInt[d], dimListInt[d]);
+  }
+  rewriter.replaceOp(op, roll);
   return success();
 }
 
@@ -2455,6 +2509,8 @@ class ConvertTorchToMhlo
     INSERT_ATENOP_PATTERN(AtenSliceTensorOp);
     INSERT_ATENOP_PATTERN(AtenIndexSelectOp);
     INSERT_ATENOP_PATTERN(AtenSqueezeDimOp);
+    INSERT_ATENOP_PATTERN(AtenFlipOp);
+    INSERT_ATENOP_PATTERN(AtenRollOp);
     // INSERT_ATENOP_PATTERN(AtenGeluBackwardOp);
 #undef INSERT_ATENOP_PATTERN
 

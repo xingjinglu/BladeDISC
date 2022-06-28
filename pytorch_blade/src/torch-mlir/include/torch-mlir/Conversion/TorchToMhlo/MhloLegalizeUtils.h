@@ -203,11 +203,18 @@ Value getDynamicSlice(
     llvm::Optional<Value> stepOpt,
     int64_t dim);
 
-Value getIndexSelect(
+Value getGatheredTensor(
     PatternRewriter& rewriter,
     Operation* op,
-    Value input,
-    Value selectIndex,
+    Value params,
+    Value indices,
+    int64_t axis);
+
+mlir::Value getRollTensor(
+    PatternRewriter& rewriter,
+    Operation* op,
+    mlir::Value input,
+    int64_t shiftInt,
     int64_t dim);
 
 } // namespace mhlo

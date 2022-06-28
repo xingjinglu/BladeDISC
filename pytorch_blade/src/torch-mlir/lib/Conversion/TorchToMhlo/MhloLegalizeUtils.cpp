@@ -779,47 +779,112 @@ Value getDynamicSlice(
       rewriter, op, input, normStartIndex, normEndIndex, step, dim);
 }
 
-Value getIndexSelect(
+Value getGatheredTensor(
     PatternRewriter& rewriter,
     Operation* op,
-    Value input,
-    Value selectIndex,
-    int64_t dim) {
+    Value params,
+    Value indices,
+    int64_t axis) {
   auto loc = op->getLoc();
-  auto inputTy = input.getType().dyn_cast<RankedTensorType>();
-  auto rank = inputTy.getRank();
-
-  dim = (dim + rank) % rank;
-  auto i64Type = rewriter.getI64Type();
-  auto dimSize = rewriter.create<arith::IndexCastOp>(
-      loc, i64Type, rewriter.create<tensor::DimOp>(loc, input, dim));
-
+  auto i32Type = rewriter.getI32Type();
   Value one = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getIntegerAttr(i64Type, 1));
+      loc, rewriter.getIntegerAttr(i32Type, 1));
 
-  auto startIndex =
-      getNormalizedDimSizeInternal(rewriter, op, selectIndex, dimSize);
-  auto endIndex = rewriter.create<arith::AddIOp>(loc, startIndex, one);
-  auto result = getDynamicSliceInternal(
-      rewriter, op, input, startIndex, endIndex, one, dim);
-  SmallVector<Value, 4> newDimSizes;
-  SmallVector<int64_t, 4> newShape;
-  newDimSizes.reserve(rank - 1);
-  newShape.reserve(rank - 1);
-  for (size_t k = 0; k < rank; ++k) {
-    if (k != dim) {
-      newDimSizes.push_back(rewriter.create<arith::IndexCastOp>(
-          loc,
-          rewriter.getI32Type(),
-          rewriter.create<tensor::DimOp>(loc, result, k)));
-      newShape.push_back(inputTy.getShape()[k]);
+  // sliceSizes
+  auto paramsRankTy = params.getType().dyn_cast<RankedTensorType>();
+  auto paramsRank = paramsRankTy.getRank();
+  SmallVector<Value, 4> sliceSizes;
+  sliceSizes.reserve(paramsRank);
+  for (int64_t r = 0; r < paramsRank; ++r) {
+    if (r == axis) {
+      sliceSizes.push_back(one);
+    } else {
+      sliceSizes.push_back(rewriter.create<arith::IndexCastOp>(
+          loc, i32Type, rewriter.create<tensor::DimOp>(loc, params, r)));
     }
   }
+  auto sliceSizesTensor =
+      rewriter.create<tensor::FromElementsOp>(loc, sliceSizes);
 
-  auto outTy = RankedTensorType::get(newShape, inputTy.getElementType());
-  auto mhloShape = rewriter.create<tensor::FromElementsOp>(loc, newDimSizes);
-  return rewriter.create<mhlo::DynamicReshapeOp>(loc, outTy, result, mhloShape)
+  // offsetDims
+  SmallVector<int64_t, 4> offsetDims;
+  offsetDims.reserve(paramsRank);
+  for (int64_t r = 0; r < axis; ++r) {
+    offsetDims.push_back(r);
+  }
+  auto indicesRankTy = indices.getType().dyn_cast<RankedTensorType>();
+  auto indicesRank = indicesRankTy.getRank();
+  for (int64_t r = axis + 1; r < paramsRank; ++r) {
+    offsetDims.push_back(r + indicesRank - 1);
+  }
+
+  // collapsedSliceDims
+  SmallVector<int64_t, 4> collapsedSliceDims(1, axis);
+  // startIndexMap
+  SmallVector<int64_t, 4> startIndexMap(1, axis);
+  // indexVecDim
+  int64_t indexVecDim = indicesRank;
+  auto dimsAttr = GatherDimensionNumbersAttr::get(
+      rewriter.getContext(),
+      /*offsetDims=*/offsetDims,
+      /*collapsedSliceDims=*/collapsedSliceDims,
+      /*startIndexMap=*/startIndexMap,
+      /*indexVecDim=*/indexVecDim);
+
+  // outputShape = params.shape[:axis] + indices.shape +
+  //                params.shape[axis + 1:]
+  auto paramsShape = paramsRankTy.getShape();
+  auto indicesShape = indicesRankTy.getShape();
+  SmallVector<int64_t, 4> outputShape(
+      paramsShape.begin(), paramsShape.begin() + axis);
+  outputShape.insert(
+      outputShape.end(), indicesShape.begin(), indicesShape.end());
+  outputShape.insert(
+      outputShape.end(), paramsShape.begin() + axis + 1, paramsShape.end());
+
+  // create output tensor type
+  auto outputTy =
+      RankedTensorType::get(outputShape, paramsRankTy.getElementType());
+  return rewriter
+      .create<mhlo::DynamicGatherOp>(
+          loc, outputTy, params, indices, sliceSizesTensor, dimsAttr)
       .getResult();
 }
+
+mlir::Value getRollTensor(
+    PatternRewriter& rewriter,
+    Operation* op,
+    mlir::Value input,
+    int64_t shiftInt,
+    int64_t dim) {
+  // roll(input, shift, dim) = cat(
+  //   slice(input, (dimSize - shift) % dimSize, dimSize),
+  //   slice(input, 0, - shift))
+  auto loc = op->getLoc();
+  Value dimSize = rewriter.create<arith::IndexCastOp>(
+      loc,
+      rewriter.getI64Type(),
+      rewriter.create<tensor::DimOp>(loc, input, dim));
+
+  Value zero =
+      rewriter.create<arith::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+  Value one =
+      rewriter.create<arith::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+  Value shift = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI64IntegerAttr(shiftInt));
+  Value splitPos = rewriter.create<arith::SubIOp>(loc, dimSize, shift);
+  splitPos = rewriter.create<arith::RemSIOp>(loc, splitPos, dimSize);
+  auto lhs =
+      getDynamicSliceInternal(rewriter, op, input, splitPos, dimSize, one, dim);
+  auto rhs =
+      getDynamicSliceInternal(rewriter, op, input, zero, splitPos, one, dim);
+  auto result = rewriter.create<mhlo::ConcatenateOp>(
+      loc,
+      input.getType(),
+      ArrayRef<Value>{lhs, rhs},
+      rewriter.getI64IntegerAttr(dim));
+  return result;
+}
+
 } // namespace mhlo
 } // namespace mlir
