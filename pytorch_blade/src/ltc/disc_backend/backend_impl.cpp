@@ -18,6 +18,7 @@
 #include <torch/csrc/lazy/core/config.h>
 #include <torch/csrc/lazy/core/ir_dump_util.h>
 #include <torch/csrc/lazy/core/lazy_graph_executor.h>
+#include <torch/csrc/lazy/ts_backend/ir_builder.h>
 #include <torch/csrc/lazy/ts_backend/ts_backend_impl.h>
 #include <torch/csrc/lazy/ts_backend/ts_lowering_context.h>
 #include "common_utils/logging.h"
@@ -76,6 +77,22 @@ class DISCBackendImpl : public torch::lazy::BackendImplInterface {
     cache_ = std::make_shared<DiscComputationCache>(
         FLAGS_torch_lazy_compilation_cache_size);
   }
+
+  const torch::lazy::IrBuilder* GetIrBuilder() const override {
+    static const torch::lazy::IrBuilder* builder =
+        new torch::lazy::TorchScriptIrBuilder();
+    return builder;
+  }
+
+  torch::lazy::BackendDataPtr GetComputationDataFromNode(
+      torch::lazy::Node* node) const {
+    auto* device_data_node = dynamic_cast<torch::lazy::DeviceData*>(node);
+    if (!device_data_node) {
+      return nullptr;
+    }
+    return device_data_node->data();
+  }
+
   std::unique_ptr<torch::lazy::LoweringContext> CreateLoweringContext(
       const std::string& name,
       torch::lazy::BackendDevice device,

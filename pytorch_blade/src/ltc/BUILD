@@ -8,6 +8,7 @@ cc_library (
   hdrs = [
     "disc_backend/backend_impl.h",
   ],
+  includes = ["include/torch/csrc/"],
   deps = [
     "//src/ltc/disc_compiler:disc_compiler",
   ],
