@@ -10,9 +10,9 @@
 # limitations under the License.
 
 import torch
-from torch.onnx.symbolic_helper import _default_onnx_opset_version, _set_opset_version
-from torch.onnx import OperatorExportTypes
-from torch.onnx.symbolic_helper import _export_onnx_opset_version
+# from torch.onnx.symbolic_helper import _default_onnx_opset_version, _set_opset_version
+# from torch.onnx import OperatorExportTypes
+# from torch.onnx.symbolic_helper import _export_onnx_opset_version
 
 import torch_blade
 from torch_blade import utils

@@ -87,9 +87,11 @@ class VerifyMhloBackendContractPass
     for (auto arg : body.getArguments()) {
       new_arg_types.push_back(convert_ty(arg));
     }
+    func.dump();
     auto ret_types = returnOp.getOperandTypes();
     // update the argumetns type
     func.setType(FunctionType::get(context, new_arg_types, ret_types));
+    func.dump();
   }
 
   void runOnOperation() override {
@@ -175,7 +177,6 @@ void TorchConversion::createTorchBackendToMhloBackendPipeline(
     const Torch::TorchLoweringPipelineOptions& options) {
   // Check some invariants to catch errors in a clear way.
   pm.addPass(createVerifyInvariantsBeforeBackendLoweringPass());
-  pm.addNestedPass<func::FuncOp>(createApplyValueSemanticsPass());
 
   ::mlir::torch::Torch::TorchLoweringPipelineOptions funcOptions;
   funcOptions.decompose = false;
@@ -189,8 +190,6 @@ void TorchConversion::createTorchBackendToMhloBackendPipeline(
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   pm.addNestedPass<func::FuncOp>(createApplyValueSemanticsPass());
-
-  // Check some invariants to catch errors in a clear way.
   pm.addNestedPass<func::FuncOp>(createConvertTorchToMhloPass());
   pm.addNestedPass<func::FuncOp>(createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(createConvertTorchToStdPass());

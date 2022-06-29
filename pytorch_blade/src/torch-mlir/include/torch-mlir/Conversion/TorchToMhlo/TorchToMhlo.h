@@ -31,6 +31,7 @@ namespace torch {
 namespace Torch {
 class TorchLoweringPipelineOptions;
 LogicalResult reduceTensorConversions(func::FuncOp& func);
+
 } // namespace Torch
 
 namespace TorchConversion {
@@ -39,6 +40,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createApplyValueSemanticsPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createDiscDecomposeComplexOpsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createVerifyMhloBackendContractPass();
 
+std::unique_ptr<OperationPass<ModuleOp>>
+createAdjustMhloCallingConventionsPass();
 void createTorchBackendToMhloBackendPipeline(
     OpPassManager& pm,
     const torch::Torch::TorchLoweringPipelineOptions& options);

@@ -1162,6 +1162,7 @@ class ConvertAtenMatmulBaseOp : public OpConversionPattern<AtenOpT> {
       OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     Value lhs, rhs;
+
     if (failed(readMatMulInputs(op, adaptor, rewriter, lhs, rhs)))
       return op.emitError("Failed to read matmul inputs");
 
@@ -1176,7 +1177,6 @@ class ConvertAtenMatmulBaseOp : public OpConversionPattern<AtenOpT> {
             ->convertType(op.getType())
             .template cast<RankedTensorType>(),
         output);
-
     return success();
   }
 };
@@ -1321,7 +1321,6 @@ class ConvertAtenLinearOp : public ConvertAtenMatmulBaseOp<AtenOpT> {
                                nullptr)
                            .getResult();
     }
-
     rewriter.replaceOpWithNewOp<mhlo::ConvertOp>(
         op,
         OpConversionPattern<AtenOpT>::getTypeConverter()->convertType(
@@ -1564,7 +1563,6 @@ LogicalResult ConvertAtenOp<AtenTransposeIntOp>::matchAndRewrite(
       mhlo::getPermutedTensor(rewriter, op, adaptor.self(), permutations);
   rewriter.replaceOpWithNewOp<mhlo::ConvertOp>(
       op, getTypeConverter()->convertType(op.getType()), transposed);
-
   return success();
 }
 
@@ -2535,6 +2533,7 @@ class ConvertTorchToMhlo
       typeConverter, context);
     INSERT_ONEDIM_REDUCTION_OP_PATTERN(AtenMeanDimOp, mhlo::AddOp)
     INSERT_ONEDIM_REDUCTION_OP_PATTERN(AtenAnyDimOp, mhlo::OrOp)
+    INSERT_ONEDIM_REDUCTION_OP_PATTERN(AtenMaxDimValuesOp, mhlo::MaxOp)
 #undef INSERT_ONEDIM_REDUCTION_OP_PATTERN
 
 #define INSERT_ALLDIMS_REDUCTION_OP_PATTERN(AtenOp, MhloOp)    \
@@ -2544,6 +2543,7 @@ class ConvertTorchToMhlo
     INSERT_ALLDIMS_REDUCTION_OP_PATTERN(AtenAllOp, mhlo::AndOp)
     INSERT_ALLDIMS_REDUCTION_OP_PATTERN(AtenAnyOp, mhlo::OrOp)
     INSERT_ALLDIMS_REDUCTION_OP_PATTERN(AtenSumOp, mhlo::AddOp)
+    // INSERT_ALLDIMS_REDUCTION_OP_PATTERN(AtenMaxOp, mhlo::MaxOp)
 #undef INSERT_ALLDIMS_REDUCTION_OP_PATTERN
 
     if (failed(applyPartialConversion(

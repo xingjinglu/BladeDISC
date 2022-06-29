@@ -177,4 +177,6 @@ def _optimize_mlir(script_module):
 
     with tools.trust_tracing_shape():
         fusion_block(graph)
+        with open('bert.c_module.code.py', 'w') as f:
+            f.write(str(c_module.forward.code))
         _disc_engine_conversion(c_module)
