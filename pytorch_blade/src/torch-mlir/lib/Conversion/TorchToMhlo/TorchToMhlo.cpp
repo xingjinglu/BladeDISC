@@ -782,7 +782,8 @@ LogicalResult ConvertAtenOp<AtenGeluOp>::matchAndRewrite(
   auto erf = rewriter.create<mlir::chlo::ErfOp>(loc, erf_element);
   auto erf_add = rewriter.create<mhlo::AddOp>(loc, erf, one);
   auto half_mul = rewriter.create<mhlo::MulOp>(loc, erf_add, half);
-  rewriter.replaceOpWithNewOp<mhlo::MulOp>(op, input, half_mul);
+  rewriter.replaceOpWithNewOp<mhlo::MulOp>(
+      op, getTypeConverter()->convertType(op.getType()), input, half_mul);
   return success();
 }
 
@@ -1653,6 +1654,7 @@ LogicalResult ConvertAtenOp<PrimNumToTensorScalarOp>::matchAndRewrite(
   return success();
 }
 
+template <>
 LogicalResult ConvertAtenOp<AtenTensorIntOp>::matchAndRewrite(
     AtenTensorIntOp op,
     OpAdaptor adaptor,

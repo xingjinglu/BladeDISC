@@ -52,7 +52,7 @@ except ImportError as e:
 
 def init_ltc_disc_backend():
     if _is_ltc_available:
-        torch._C._lazy_ts_backend._init()
+        # torch._C._lazy_ts_backend._init()
         ltc._init_disc_backend()
         torch._C._jit_set_profiling_executor(False)
         torch._C._jit_set_profiling_mode(False)

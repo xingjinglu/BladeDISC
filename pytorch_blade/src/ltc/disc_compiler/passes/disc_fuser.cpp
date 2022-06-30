@@ -90,6 +90,7 @@ bool IsDiscFusable(const torch::jit::Node* node) {
           input->node()->kind() != torch::prim::Constant) {
         return false;
       }
+      // to avoid unk dtype and rank
       if (missingCompleteType(input->type())) {
         return false;
       }
@@ -98,6 +99,10 @@ bool IsDiscFusable(const torch::jit::Node* node) {
     for (auto& output : node->outputs()) {
       if (!output->type()->cast<c10::TensorType>())
         return false;
+      // to avoid unk dtype and rank
+      if (missingCompleteType(output->type())) {
+        return false;
+      }
     }
     return true;
   }
