@@ -54,6 +54,13 @@ def init_ltc_disc_backend():
     if _is_ltc_available:
         torch._C._lazy_ts_backend._init()
         ltc._init_disc_backend()
+        torch._C._jit_set_profiling_executor(False)
+        torch._C._jit_set_profiling_mode(False)
+        torch._C._jit_set_texpr_fuser_enabled(False)
+        torch._C._jit_set_nvfuser_guard_mode(False)
+        torch._C._jit_set_nvfuser_enabled(False)
+        torch._C._jit_set_inline_everything_mode(True)
+        torch._C._get_graph_executor_optimize(False)
     else:
         raise RuntimeError('''LTC Disc accelerator is not released in the
 current TorchBlade version, please update to the latest.''')

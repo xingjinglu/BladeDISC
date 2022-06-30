@@ -87,11 +87,9 @@ class VerifyMhloBackendContractPass
     for (auto arg : body.getArguments()) {
       new_arg_types.push_back(convert_ty(arg));
     }
-    func.dump();
     auto ret_types = returnOp.getOperandTypes();
     // update the argumetns type
     func.setType(FunctionType::get(context, new_arg_types, ret_types));
-    func.dump();
   }
 
   void runOnOperation() override {

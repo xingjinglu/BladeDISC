@@ -435,16 +435,13 @@ class ConvertAtenAddSubOp : public OpConversionPattern<AtenOpT> {
     rhsType = rhsTensor.getType().dyn_cast<TensorType>();
 
     // Handle alpha.
-    Value alphaTensor;
-    if (failed(torchScalarToMhloTensorLike(
-            rewriter, op.getOperation(), op.alpha(), rhsTensor, alphaTensor))) {
-      return op.emitError(
-          "Currently only scalar constants are supported for "
-          "alpha in conversion to MHLO operation");
-    }
+    Value alphaTensor = scalarToMhloTensor(
+        rewriter, op, adaptor.alpha(), rhsType.getElementType(), {});
+
     auto multTensor =
         rewriter
-            .create<mhlo::MulOp>(op.getLoc(), rhsType, rhsTensor, alphaTensor)
+            .create<chlo::BroadcastMulOp>(
+                op.getLoc(), rhsType, rhsTensor, alphaTensor, nullptr)
             .getResult();
 
     if (lhsType.getElementType() != outElemTy)

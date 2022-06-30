@@ -87,6 +87,7 @@ ExecutablePtr CompileToDiscExecutable(
     c10::ArrayRef<torch::lazy::BackendDataPtr> arguments) {
   bool disable_disc = torch::blade::env::ReadBoolFromEnvVar(
       "TORCH_DISC_LTC_DISABLE_DISC", false);
+  GRAPH_DEBUG("Input graph:\n ", *graph);
   if (disable_disc) {
     auto disc_inputs = std::vector<c10::IValue>{};
     return std::make_shared<Executable>(graph, disc_inputs);
